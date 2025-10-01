@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="STARPILOTE">
+<meta name="theme-color" content="#ff0000">
+  <meta charset="UTF-8">
+  <title>STARPILOTE v1.0</title>
+  <style>
+    body {
+      background-color: black;
+      color: red;
+      font-family: monospace;
+      text-align: center;
+      padding: 10px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .clock {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+    .speed {
+      font-size: 28px;
+      border: 2px solid red;
+      padding: 10px;
+      margin: 10px auto;
+      width: 250px;
+     }
+
+ .turbo-wrap {
+  margin:10px auto;
+  width:250px;
+  text-align:center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px; /* espace entre l'image et la barre */
+}
+
+.turbo-img {
+  width: 40px;   /* taille de l'image */
+  height: 40px;
+}
+  .turbo-bar {
+    width:200px;
+    height:18px;
+    border:2px solid #f00;
+    margin:5px auto;
+    position:relative;
+  }
+  .turbo-fill {
+    height:100%;
+    width:0;
+    background:#f00;
+  }
+  .turbo-status {margin-top:5px;}
+  .turbo-status.active {color:#0f0;}
+  #map {
+    width:320px;
+    height:200px;
+    margin:20px auto;
+    border:2px solid #f00;
+  }
+    .gps {
+      margin: 20px auto;
+      font-size: 16px;
+      line-height: 1.5em;
+    }
+    #map {
+      margin: 10px auto;
+      width: 300px;
+      height: 200px;
+      border: 2px solid red;
+    }
+    .car {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.car-img {
+  width: 100px;  /* largeur de l'image */
+  height: auto;
+  margin-bottom: 5px; /* espace entre l'image et le texte */
+}
+
+  </style>
+</head>
+<body>
+  <div class="title"> STARPILOTE v1.0 </div>
+  <div class="clock" id="clock">00:00:00</div>
+
+  <div class="speed" id="speed">SPEED: 0 km/h</div>
+
+ <div class="turbo-wrap">
+  <img src="turbo.png" alt="Turbo" class="turbo-img">
+  <div class="turbo-bar"><div class="turbo-fill" id="turboFill"></div></div>
+  <div class="turbo-status" id="turboStatus">INACTIF</div>
+</div>
+
+
+  <div class="gps" id="gps">
+    CAP: -- <br>
+    LAT: -- <br>
+    LON: -- <br>
+    ALT: -- m
+  </div>
+
+  <div id="map"></div>
+
+<div class="car">
+  <img src="clio.png" alt="Clio" class="car-img">
+  <div>CLIO 2 MK2</div>
+</div>
+
+  
+
+  <script>
+    // Enregistrement du service worker pour PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js').then(function(registration) {
+          console.log('ServiceWorker enregistré avec succès:', registration);
+        }, function(err) {
+          console.log('Erreur ServiceWorker:', err);
+        });
+      });
+    }
+    // Horloge en temps réel
+    function updateClock() {
+      const now = new Date();
+      document.getElementById("clock").textContent =
+        now.toLocaleTimeString("fr-FR");
+    }
+    setInterval(updateClock, 1000);
+
+ // Turbo
+
+
+  const turboFill = document.getElementById("turboFill");
+  const turboStatus = document.getElementById("turboStatus");
+  let turboRunning = false;
+
+  function startTurbo(duration=1000){
+    if(turboRunning) return;
+    turboRunning = true;
+    turboStatus.textContent = "CHARGEMENT...";
+    turboStatus.classList.remove("active");
+    turboFill.style.width = "0";
+    let start = Date.now();
+    let timer = setInterval(()=>{
+      let progress = (Date.now() - start)/duration;
+      if(progress >= 1){
+        turboFill.style.width = "100%";
+        turboStatus.textContent = "ACTIVÉ";
+        turboStatus.classList.add("active");
+        clearInterval(timer);
+        turboRunning = false;
+      } else {
+        turboFill.style.width = (progress*100)+"%";
+      }
+    },50);
+  }
+
+
+
+    // GPS + vitesse en temps réel
+    function updateGPS(position) {
+      let lat = position.coords.latitude.toFixed(5);
+      let lon = position.coords.longitude.toFixed(5);
+      let alt = position.coords.altitude ? position.coords.altitude.toFixed(1) : "N/A";
+      let speed = position.coords.speed ? (position.coords.speed * 3.6).toFixed(1) : 0; // m/s → km/h
+      let cap = position.coords.heading ? position.coords.heading.toFixed(0) + "°" : "--";
+
+      document.getElementById("speed").textContent = "SPEED: " + speed + " km/h";
+
+      document.getElementById("gps").innerHTML =
+        "CAP: " + cap + "<br>" +
+        "LAT: " + lat + "°<br>" +
+        "LON: " + lon + "°<br>" +
+        "ALT: " + alt + " m";
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition(updateGPS, 
+        err => { document.getElementById("gps").textContent = "Erreur GPS : " + err.message; },
+        { enableHighAccuracy: true }
+      );
+    } else {
+      document.getElementById("gps").textContent = "GPS non supporté.";
+    }
+
+    // Carte OpenStreetMap (gratuit, pas besoin de clé API)
+    function initMap(lat = 48.8566, lon = 2.3522) {
+      let map = L.map('map').setView([lat, lon], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+
+      let marker = L.marker([lat, lon]).addTo(map);
+
+      navigator.geolocation.watchPosition(pos => {
+        let newLat = pos.coords.latitude;
+        let newLon = pos.coords.longitude;
+        map.setView([newLat, newLon], 15);
+        marker.setLatLng([newLat, newLon]);
+      });
+    }
+  </script>
+  <!-- Librairie Leaflet pour la carte -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <script>
+    initMap();
+  </script>
+</body>
+</html>      
